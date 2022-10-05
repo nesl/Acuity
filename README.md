@@ -6,7 +6,7 @@ Install appropriate ROS distribution depending on linux version: [ROS Download](
 ### Intel Realsense Installation:
 Install Intel Realsense from the following link: [Intel Realsense Installation](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md)
 
-Follow the instructions to install the pre-built packages
+Follow the instructions to install the pre-built packages, including dev and debug.
 
 ### OpenCV Installation:
 This project leverages the Aruco AprilTag library from OpenCV, specifically the 36h11 tag family. This was introduced in the 3.4.2 version. Older versions of OpenCV will not be compatible with the current code. 
