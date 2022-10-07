@@ -23,3 +23,6 @@ To install the HARK Audio Library, visit the following link: [HARK Installation]
 
 ### Install ROS for HARK:
 To install the HARK ROS Bridge: [HARK ROS](https://hark.jp/hark-ros-msgs-installation-instructions/).
+
+### Change Code Parameters
+hark/hark-linux-3.3.0/librecorder/ALSARecorder.cpp
