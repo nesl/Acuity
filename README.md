@@ -1,4 +1,4 @@
-## Installation
+## Installation Dependencies
 
 ### ROS Installation:
 Install appropriate ROS distribution depending on linux version: [ROS Download](http://wiki.ros.org/ROS/Installation)
@@ -27,3 +27,8 @@ To install the HARK ROS Bridge: [HARK ROS](https://hark.jp/hark-ros-msgs-install
 ### Change Code Parameters
 hark/hark-linux-3.3.0/librecorder/ALSARecorder.cpp
 Change buffer time to 30000
+
+## Build Project
+
+### Catkin Workspace
+Follow tutorial listed [here] (http://wiki.ros.org/catkin/Tutorials/create_a_workspace) to create a catkin_workspace. 
