@@ -57,6 +57,7 @@ int personIDNum = 0;
 //process function that takes in a pointcloud and publishes the centroid coordinates as well as the subtracted cloud
 void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &data)
 {
+    double startTime = ros::Time::now().toSec();
     //Fill octree with pointcloud data
     octree->setInputCloud(data);
     octree->addPointsFromInputCloud();
@@ -64,7 +65,11 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &data)
     octree->getPointIndicesFromNewVoxels(diff_point_vector); //Extract points that differ
     int size = diff_point_vector.size();                     //Store in size variable to avoid calling .size() in loop
     octree->deleteCurrentBuffer();
+    
+    
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr diff_cloud_ptr(new pcl::PointCloud<pcl::PointXYZRGB>); //Create new pointcloud to fill with the points that differ
+
+
 
     //Parallelizing doesn't seem to result in significant performance gain
     for (int pc_counter = 0; pc_counter < size; pc_counter++)
@@ -82,38 +87,10 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &data)
     }
 
     //Utilize a VoxelGrid filter to downsample pointcloud, makes later data processing much faster
-
     pcl::VoxelGrid<pcl::PointXYZRGB> filter;
     filter.setInputCloud(diff_cloud_ptr);
-    filter.setLeafSize(0.027, 0.027f, 0.027f); //Might be able to adjust this to a larger value since we don't need high resolution for this pointcloud
+    filter.setLeafSize(0.01, 0.01, 0.01); //Might be able to adjust this to a larger value since we don't need high resolution for this pointcloud
     filter.filter(*diff_cloud_ptr);
-
-
-    //PCL segmentation functions that help extract meaningful features
-    pcl::SACSegmentation<pcl::PointXYZRGB> seg;
-    pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
-    pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_plane(new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::PCDWriter writer;
-    seg.setOptimizeCoefficients(true);
-    seg.setModelType(pcl::SACMODEL_PLANE);
-    seg.setMethodType(pcl::SAC_RANSAC);
-    seg.setMaxIterations(100);
-    seg.setDistanceThreshold(0.08); //How close it must be to be an inlier
-    seg.setInputCloud(diff_cloud_ptr);
-    seg.segment(*inliers, *coefficients);
-    if (inliers->indices.size() == 0)
-    {
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-        temp_cloud->header.frame_id = "backgone3";
-        pub.publish(temp_cloud);
-        return;
-    }
-    // Extract the planar inliers from the input cloud
-    pcl::ExtractIndices<pcl::PointXYZRGB> extract;
-    extract.setInputCloud(diff_cloud_ptr);
-    extract.setIndices(inliers);
-    extract.setNegative(false);
 
     //Search for meaningful clusters
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>);
@@ -122,14 +99,17 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &data)
     pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
     ec.setClusterTolerance(0.1); // 10cm
     ec.setMinClusterSize(500);   //Adjust this to detect people only, depends on how camera is oriented
-    ec.setMaxClusterSize(70000);
+    ec.setMaxClusterSize(700000);
     ec.setSearchMethod(tree);
     ec.setInputCloud(diff_cloud_ptr);
     ec.extract(cluster_indices);
+    std::cout << ros::Time::now().toSec() - startTime << std::endl;
 
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr background_points(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr person_clusters(new pcl::PointCloud<pcl::PointXYZRGB>);
-    
+    diff_cloud_ptr->header.frame_id = "backgone3";
+    pub.publish(diff_cloud_ptr);
+    return;
     //Add all meaningful clusters to the pointcloud object
     int loopCount3 = 0;
     
@@ -193,7 +173,6 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &data)
         c1.y = -c1.y; //TODO: THIS IS PURELY FOR ARENA
         c1.z = c1.z - 1.4;
         c1.x = -c1.x;
-        std::cout << c1.x << " " << c1.y << " " << c1.z << std::endl;
         boxFilter.setMin(Eigen::Vector4f(c1.x - ((maxX - minX) / 2 + 0.05), c1.y - ((maxY - minY) / 2 + 0.05), c1.z - ((maxZ - minZ) / 2 + 0.05), 1.0));
         boxFilter.setMax(Eigen::Vector4f(c1.x + ((maxX - minX) / 2 + 0.05), c1.y + ((maxY - minY) / 2 + 0.05), c1.z + ((maxZ - minZ) / 2 + 0.05), 1.0));
         boxFilter.setInputCloud(data);
@@ -277,7 +256,7 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &data)
     }
 
     person_clusters_filtered->header.frame_id = "backgone3";
-    pub.publish(person_clusters_filtered);
+    
     pub2.publish(arrOfPeople);
 }
 
@@ -303,14 +282,14 @@ int main(int argc, char *argv[])
     ros::NodeHandle nh;
     rs2::pointcloud pc;
     rs2::config cfg;
-    cloud_publisher = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB>>("/camera3/clouds/original_cloud", 2);
+    cloud_publisher = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB>>("/camera2/original", 2);
     color_publisher = nh.advertise<sensor_msgs::Image>("/camera3/color", 2);
     pub = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB>>("/camera3/clouds/subtracted", 2);
     pub2 = nh.advertise<PersonArr>("/camera3/people", 2);
     //Only enable camera and depth, other streams will likely cause more latency
     rs2::points points;
-    cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_RGB8, 30);
-    cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
+    cfg.enable_stream(RS2_STREAM_COLOR, 960, 540, RS2_FORMAT_RGB8, 30);
+    cfg.enable_stream(RS2_STREAM_DEPTH, 1024, 768, RS2_FORMAT_Z16, 30);
     // Declare RealSense pipeline, encapsulating the actual device and sensors
     rs2::pipeline pipe;
     // Start streaming with default recommended configuration
@@ -326,7 +305,6 @@ int main(int argc, char *argv[])
         auto color = frames.get_color_frame();
         //map pointcloud to color? (I don't really know what this does)
         pc.map_to(color);
-        double startTime = ros::Time::now().toSec();
         int colorHeight = color.get_height();
         int colorWidth = color.get_width();
         int colorBytes = color.get_bytes_per_pixel();
@@ -360,7 +338,7 @@ int main(int argc, char *argv[])
 
         //Only utilizes every third point to downsample higher up the pipeline and improve performance
         //On Intel NUC, 30fps is achieved such that the limiting factor is the framerate of camera!!
-        for (int i = 0; i < pointSize; i += 3)
+        for (int i = 0; i < pointSize; i++)
         {
             pcl::PointXYZRGB temp;
             auto tempVertexElem = Vertex[i];
@@ -392,24 +370,22 @@ int main(int argc, char *argv[])
         color_img.header.stamp.nsec = (ros::Time::now().toSec() - (int) (ros::Time::now().toSec())) * 1e9;
 
         //CYCLE THE BUFFERS OF THE OCTREE, I HAVE NO IDEA WHY THIS FIXES IT
-        if (initializing && currNumFrames++ <= 300)
-        {
-            initializeCamera(pcl_points);
-            continue;
-        }
-        if (initializing)
-        {
-            initializeCamera(pcl_points);
-            initializing = false;
-            std::cout << "Done" << std::endl;
-        }
-        else
-        {
-            process(pcl_points);
-        }
+        // if (initializing && currNumFrames++ <= 100)
+        // {
+        //     initializeCamera(pcl_points);
+        //     continue;
+        // }
+        // if (initializing)
+        // {
+        //     initializeCamera(pcl_points);
+        //     initializing = false;
+        //     std::cout << "Done" << std::endl;
+        // }
+        // else
+        // {
+        //     process(pcl_points);
+        // }
         cloud_publisher.publish(pcl_points);
         color_publisher.publish(color_img);
-        double timeDiff = ros::Time::now().toSec() - startTime;
-        std::cout << timeDiff << std::endl;
     }
 }

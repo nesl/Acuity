@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   realsense2
   roscpp
   std_msgs
+  NESLMessages
 )
 find_package(OpenCV REQUIRED)
 find_package(OpenMP REQUIRED)
@@ -151,7 +152,9 @@ add_library(JASON SHARED
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 #add_executable(cam_launch src/launcher.cpp)
-add_executable(cam_launch src/launcher.cpp)
+add_executable(cam_launch1 src/launcherCam1.cpp)
+add_executable(cam_launch2 src/launcherCam2.cpp)
+add_executable(latencyEval src/backup1.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -167,7 +170,7 @@ find_package(realsense2 REQUIRED)
 ## Specify libraries to link a library or executable target against
 
 
-target_link_libraries(cam_launch
+target_link_libraries(cam_launch1
   ${PCL_LIBRARIES}
   ${pcl_ros_LIBRARIES}
   ${catkin_LIBRARIES}
@@ -177,6 +180,29 @@ target_link_libraries(cam_launch
   OpenMP::OpenMP_CXX
   JASON
 )
+
+target_link_libraries(cam_launch2
+  ${PCL_LIBRARIES}
+  ${pcl_ros_LIBRARIES}
+  ${catkin_LIBRARIES}
+  ${librealsense_LIBARIES}
+  ${realsense2_LIBRARY}
+  ${OpenCV_LIBRARIES}
+  OpenMP::OpenMP_CXX
+  JASON
+)
+
+target_link_libraries(latencyEval
+  ${PCL_LIBRARIES}
+  ${pcl_ros_LIBRARIES}
+  ${catkin_LIBRARIES}
+  ${librealsense_LIBARIES}
+  ${realsense2_LIBRARY}
+  ${OpenCV_LIBRARIES}
+  OpenMP::OpenMP_CXX
+  JASON
+)
+
 
 
 #############
