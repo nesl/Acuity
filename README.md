@@ -51,8 +51,15 @@ Copy the hark message files in {HARK DOWNLOAD DIRECTORY}/hark-ros-msgs-{VERSION}
 
 Run catkin_make another time. This should now build with no errors!
 
+## Running the Code
+
 Run the following command with a realsense camera to make sure everything is functional: 
 ```
 rosrun cam_launch cam_launch1
 ```
 If you run into errors, make sure there is a roscore running, and also make sure to source the devel/setup.bash file.
+
+This will print out the camera model number. This will be different from the default camera number in the src/cam_launch/src/launcher1.cpp file. Change the 
+CAM1_NAME parameter on line 75 to the appropriate serial number. 
+
+Recompiling with `catkin_make` and 
