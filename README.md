@@ -68,4 +68,10 @@ Recompile with `catkin_make` and run with `rosrun cam_launch cam_launch1`. Exit 
 
 You can view the subtracted point clouds by utiling **RVIZ**. RVIZ comes with ROS installation. Run RVIZ with `rviz` in any terminal.
 
-Subscribe to the appropriate topic.
+Subscribe to the appropriate topic. Note that the point cloud will not display due to an undefined coordinate frame. Establish a coordinate frame by running:
+```
+rosrun tf static_transform_publisher 0 0 0 0 0 0 map backgone1 30
+```
+on any terminal, making sure to source the devel/setup.bash directory if it is not found.
+
+The separated point cloud should now be shown on RVIZ
