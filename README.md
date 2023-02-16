@@ -26,7 +26,11 @@ To install the HARK ROS Bridge: [HARK ROS](https://hark.jp/hark-ros-msgs-install
 
 ### Change Code Parameters
 hark/hark-linux-3.3.0/librecorder/ALSARecorder.cpp
-Change buffer time to 30000
+Change buffer time to 30000 in line 138:
+
+```
+unsigned buffer_time = 500000 //Change this to 30000 to enable real-time processing
+```
 
 ## LiDAR Code
 
