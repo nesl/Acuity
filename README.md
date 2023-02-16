@@ -53,6 +53,6 @@ Run catkin_make another time. This should now build with no errors!
 
 Run the following command with a realsense camera to make sure everything is functional: 
 ```
-rosrun cam_launch1 cam_launch1
+rosrun cam_launch cam_launch1
 ```
 If you run into errors, make sure there is a roscore running, and also make sure to source the devel/setup.bash file.
