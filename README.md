@@ -23,6 +23,9 @@ To install the HARK Audio Library, visit the following link: [HARK Installation]
 
 ### Install ROS for HARK:
 To install the HARK ROS Bridge: [HARK ROS](https://hark.jp/hark-ros-msgs-installation-instructions/).
+**Make sure to install from source**
+Once you install the hark-ros-msgs directory, cd into it and run catkin_make. This will create a devel folder.
+
 
 ### Change Code Parameters
 hark/hark-linux-3.3.0/librecorder/ALSARecorder.cpp
@@ -41,5 +44,15 @@ The combine_cloud node subscribes to the message topic of both LiDAR cameras, pe
 
 
 
-## Running the Code
-Follow tutorial listed [here](http://wiki.ros.org/catkin/Tutorials/create_a_workspace) to create a catkin_workspace. Download the project files, and then copy the src directory into the catkin_ws directory in the previous step. 
+## Compiling the code
+Follow tutorial listed [here](http://wiki.ros.org/catkin/Tutorials/create_a_workspace) to create a catkin_workspace. After running catkin_make once, download the project files, and then copy the src directory into the catkin_ws directory in the previous step, replacing the src folder created by catkin_make.
+
+Copy the hark message files in {HARK DOWNLOAD DIRECTORY}/hark-ros-msgs-{VERSION}/devel/include to catkin_ws/devel/include.
+
+Run catkin_make another time. This should now build with no errors!
+
+Run the following command with a realsense camera to make sure everything is functional: 
+```
+rosrun cam_launch1 cam_launch1
+```
+If you run into errors, make sure there is a roscore running, and also make sure to source the devel/setup.bash file.
