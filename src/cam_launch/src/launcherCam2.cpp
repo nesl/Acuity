@@ -49,33 +49,31 @@ pcl::octree::OctreePointCloudChangeDetector<pcl::PointXYZRGB> *stage2_octree = n
 // Publisher nodes
 ros::Publisher subtracted_publisher;
 ros::Publisher source_publisher;
-
 ros::Publisher orig_cloud_publisher;
 
 // Keep track of original frame for background subtraction purposes
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr origFrame(new pcl::PointCloud<pcl::PointXYZRGB>());
+
 // Rotation and translation matrix from camera to the AprilTag frame
 Eigen::Matrix3d rotationMatrix;
 Eigen::Vector3d translationMatrix(0, 0, 0);
 Eigen::Vector3d zeroVectorTransformed;
-// Constants that define how much movement is occuring in the scene
-// Dictates resolution of the resulting pointcloud
-int initialDownsampleRate = 2;
-int secondDownsampleRate = 11;
-// ID number of identified person
-int personIDNum = 0;
+
 // Respeaker will point in the +y direction in AprilTag Frame
 const double respeakerX = 0;
 const double respeakerY = 0;
 const double respeakerZ = 0;
+
 //Tracker constants
 const double iouThreshold = 0.3;
 const int max_age = 15;
 const int min_hits = 3;
 
-const std::string CAM1_NAME = "f1151000";
+//LiDAR camera serial numbesr
+const std::string CAM1_NAME = "f0350398";
 const std::string CAM2_NAME = "f1271477";
 
+//Time for latency eval
 double processStart = 0;
 
 struct Coord {
@@ -92,6 +90,7 @@ struct Person {
     double bbz;
 };
 
+//Tracker data structures
 std::vector<Person> arrOfPeople;
 std::vector<KalmanTracker> trackers;
 std::vector<Rect_<double>> predictedBoxes;
@@ -119,6 +118,7 @@ void publishDummy()
     source_publisher.publish(empty_source);
 }
 
+//Extract clusters from point cloud, return as a vector
 std::vector<pcl::PointIndices> getClusters(pcl::PointCloud<pcl::PointXYZRGB>::Ptr diff_cloud_ptr)
 {
     // Search for meaningful clusters
@@ -790,8 +790,8 @@ int main(int argc, char *argv[])
             {
                 getTransform(camMatrix, distortionMatrix, cv::Mat(colorHeight, colorWidth, CV_8UC3, colorArr));
                 pipe.stop();
-                cfg.enable_stream(RS2_STREAM_COLOR, 960, 540, RS2_FORMAT_RGB8, 30);
-                cfg.enable_stream(RS2_STREAM_DEPTH, 1024, 768, RS2_FORMAT_Z16, 30);
+                cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_RGB8, 30);
+                cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
                 pipe.start(cfg);
                 continue;
             }

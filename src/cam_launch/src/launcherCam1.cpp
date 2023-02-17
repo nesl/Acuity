@@ -37,7 +37,7 @@
 #include <string>
 #include "Hungarian.h"
 #include "KalmanTracker.h"
-
+#include <mutex>
 using namespace std;
 using namespace hark_msgs;
 
@@ -50,32 +50,33 @@ pcl::octree::OctreePointCloudChangeDetector<pcl::PointXYZRGB> *stage2_octree = n
 ros::Publisher subtracted_publisher;
 ros::Publisher source_publisher;
 ros::Publisher color_publisher;
+
 // Keep track of original frame for background subtraction purposes
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr origFrame(new pcl::PointCloud<pcl::PointXYZRGB>());
+
 // Rotation and translation matrix from camera to the AprilTag frame
 Eigen::Matrix3d rotationMatrix;
 Eigen::Vector3d translationMatrix(0, 0, 0);
 Eigen::Vector3d zeroVectorTransformed;
-// Constants that define how much movement is occuring in the scene
-// Dictates resolution of the resulting pointcloud
-int initialDownsampleRate = 2;
-int secondDownsampleRate = 11;
-// ID number of identified person
-int personIDNum = 0;
 
 // Respeaker will point in the +y direction in AprilTag Frame
 const double respeakerX = 0;
 const double respeakerY = 0;
 const double respeakerZ = 0;
+
 //Tracker constants
 const double iouThreshold = 0.3;
 const int max_age = 15;
 const int min_hits = 3;
 
+//LiDAR camera serial numbers
 const std::string CAM1_NAME = "f0350398";
 const std::string CAM2_NAME = "f1271477";
+const int MIN_PERSON_POINTS = 300;
 
+//Timestamp for latency
 double processStart = 0;
+std::mutex mtx;
 
 struct Coord {
     double x;
@@ -91,6 +92,7 @@ struct Person {
     double bbz;
 };
 
+//Tracker data structures
 std::vector<Person> arrOfPeople;
 std::vector<KalmanTracker> trackers;
 std::vector<Rect_<double>> predictedBoxes;
@@ -118,6 +120,7 @@ void publishDummy()
     source_publisher.publish(empty_source);
 }
 
+//Extract clusters from given point cloud
 std::vector<pcl::PointIndices> getClusters(pcl::PointCloud<pcl::PointXYZRGB>::Ptr diff_cloud_ptr)
 {
     // Search for meaningful clusters
@@ -126,7 +129,7 @@ std::vector<pcl::PointIndices> getClusters(pcl::PointCloud<pcl::PointXYZRGB>::Pt
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
     ec.setClusterTolerance(0.10); // 15cm, increase for speed?
-    ec.setMinClusterSize(400);    // Adjust this to detect people only, depends on how camera is oriented
+    ec.setMinClusterSize(MIN_PERSON_POINTS);    // Adjust this to detect people only, depends on how camera is oriented
     ec.setMaxClusterSize(300000);
     ec.setSearchMethod(tree);
     ec.setInputCloud(diff_cloud_ptr);
@@ -134,6 +137,7 @@ std::vector<pcl::PointIndices> getClusters(pcl::PointCloud<pcl::PointXYZRGB>::Pt
     return cluster_indices;
 }
 
+//IOU for Hungarian
 double GetIOU(Rect_<float> bb_test, Rect_<float> bb_gt)
 {
     float in = (bb_test & bb_gt).area();
@@ -145,13 +149,13 @@ double GetIOU(Rect_<float> bb_test, Rect_<float> bb_gt)
     return (double)(in / un);
 }
 
-// process function that takes in a pointcloud and publishes the centroid coordinates as well as the subtracted cloud
+// Takes in a pointcloud and publishes the centroid coordinates as well as the subtracted cloud
 void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::PointXYZRGB>::Ptr data_down, int frameNum)
 {
-    // Utilize a VoxelGrid filter to match dimensions of the input w the reference, 1 ms
+    // Utilize a VoxelGrid filter to match dimensions of the input w the reference, also reduces pointcloud size further
     pcl::VoxelGrid<pcl::PointXYZRGB> filter;
     filter.setInputCloud(data_down);
-    filter.setLeafSize(0.03f, 0.03f, 0.03f); // Might be able to adjust this to a larger value since we don't need high resolution for this pointcloud
+    filter.setLeafSize(0.03f, 0.03f, 0.03f); 
     filter.filter(*data_down);
 
     // Fill octree with downsampled pointcloud data
@@ -160,8 +164,11 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
     std::vector<int> diff_point_vector;
     stage1_octree->getPointIndicesFromNewVoxels(diff_point_vector);
     int size = diff_point_vector.size();
-    // If octree freaks out and somehow deletes the reference buffer
-    if (size > 0.8 * data_down->points.size())
+
+ 
+    // Octree sometimes encounters a bug where it deletes the reference buffer, causing the background subtraction to do nothing
+    // Reset reference buffer
+    if (size > 0.9 * data_down->points.size())
     {
         filter.setInputCloud(origFrame);
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr downCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -178,8 +185,9 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
         stage1_octree->switchBuffers();
         for (int i = 0; i < 10; i++)
         {
-            std::cout << "OH NOOOOOOOOOOOOOOOOOOO" << std::endl;
+            std::cout << "WARNING: OCTREE RESET" << std::endl;
         }
+        mtx.unlock();
         return;
     }
     else
@@ -187,8 +195,8 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
         stage1_octree->deleteCurrentBuffer(); // Otherwise, delete current buffer and proceed
     }
 
-    // In case of small point cloud, simply return
-    if (diff_point_vector.size() < 400)
+    // In case of few points signalling no subjects, simply return
+    if (diff_point_vector.size() < MIN_PERSON_POINTS)
     {
         publishDummy();
         for (auto it = trackers.begin(); it != trackers.end();)
@@ -202,24 +210,24 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
                 it++;
             }
         }
+        mtx.unlock();
         return;
     }
     
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr diff_cloud_ptr(new pcl::PointCloud<pcl::PointXYZRGB>); // Create new pointcloud to fill with the points that differ
-    // Build point cloud of differing voxels, very fast, 0.7 ms?
+    // Build point cloud of differing voxels
     for (int pc_counter = 0; pc_counter < size; pc_counter++)
     {
         diff_cloud_ptr->points.push_back(data_down->points[diff_point_vector[pc_counter]]);
     }
     
-    
-    //Break point cloud into clusters, ~1ms
-    
+
+    //Break point cloud into clusters
     std::vector<pcl::PointIndices> cluster_indices = getClusters(diff_cloud_ptr);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr background_points(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr person_clusters(new pcl::PointCloud<pcl::PointXYZRGB>);
         
-    // Add all meaningful clusters to a new pointcloud object, single subject is 4.4ms
+    // Add all meaningful clusters to a new pointcloud object
     int clusterIndex = -1;
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
     {
@@ -323,7 +331,7 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
         boxFilter.setInputCloud(origFrame);
         boxFilter.filter(*temp_cloud);
         *background_points += *temp_cloud; // Filter on original frame to provide background to subtract
-        // Compute transform to APRILTAG frame and assign to Coord object
+        //Compute transform to APRILTAG frame and assign to Coord object
         Coord cvtd_centroid;
         Eigen::Vector3d camVector(orig_centroid.x + translationMatrix(0), orig_centroid.y + translationMatrix(1),
                                   orig_centroid.z + translationMatrix(2));
@@ -340,10 +348,9 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
         tempPerson.bby = maxYT - minYT;
         tempPerson.bbz = maxZT - minZT;
         arrOfPeople.push_back(tempPerson);
-
     }
-    
-    // Nothing, publish empty pointcloud
+
+    // If no clusters, publish empty pointcloud
     if (clusterIndex == -1)
     {
         publishDummy();
@@ -358,11 +365,10 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
                 it++;
             }
         }
+        mtx.unlock();
         return;
     }
     
-    //std::cout << "Frame number " << frameNum << " round 1 and clustering done at " << ros::Time::now().toSec() << std::endl;
-
     //TRACKER BEGIN 4.6e-5 performance time
     KalmanTracker::kf_count = 0;
     if (trackers.size() == 0)
@@ -381,6 +387,7 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
             trackers.push_back(trk);
         }
         //Return out of function, no need to track because first frame
+        mtx.unlock();
         return;
     }
 
@@ -435,7 +442,7 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
                         matchedItems.begin(), matchedItems.end(),
                         insert_iterator<set<int>>(unmatchedDetections, unmatchedDetections.begin()));
     }
-    //Ppl be gone
+    //Missing subjects
     else if (detNum < trkNum) // there are unmatched trajectory/predictions
     {
         for (unsigned int i = 0; i < trkNum; ++i)
@@ -517,10 +524,9 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
             it++;
         }
     }
-    
-    //std::cout << "Frame number " << frameNum << " tracking done at " << ros::Time::now().toSec() << std::endl;
 
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr person_clusters_filtered(new pcl::PointCloud<pcl::PointXYZRGB>); // Create new pointcloud to fill with the points that differ
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr person_clusters_filtered(new pcl::PointCloud<pcl::PointXYZRGB>); 
+
     //Timestamp the ros messages, send out the sources first to have more time in audio processing pipeline
     person_clusters_filtered->header.stamp = (long)(ros::Time::now().toSec() * 1e6);
     HarkSource sources;
@@ -576,10 +582,7 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
     stage2_octree->getPointIndicesFromNewVoxels(different_points); // Extract points that differ
     int size2 = different_points.size();                           // Store in size variable to avoid calling .size() in loop
     stage2_octree->deleteTree();
-
-
-
-    
+ 
     // Construct new pointcloud, BUT WITH TRANSFORMED TO APRILTAG COORDINATE FRAME!
     for (int pc_counter = 0; pc_counter < size2; pc_counter++)
     {
@@ -593,10 +596,8 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr data, pcl::PointCloud<pcl::P
     }
 
     subtracted_publisher.publish(person_clusters_filtered);
-    
     arrOfPeople.clear();
-    //std::cout << "Frame number " << frameNum << " outputted at " << ros::Time::now().toSec() << "with size " << person_clusters_filtered->points.size()<< std::endl;
-
+    mtx.unlock();
     
 }
 
@@ -631,7 +632,10 @@ void getTransform(cv::Mat cameraMatrix, cv::Mat distCoeffs, cv::Mat image)
     rotationMatrix << 1, 0, 0,
         0, 0, 1,
         0, -1, 0;
-
+    if (ids.size() == 0) {
+        std::cout << "No marker detected" << endl;
+        return;
+    }
     for (int i = 0; i < ids.size(); i++) {
         std::cout << "Detected marker: " << ids.at(i) << std::endl;
     }
@@ -651,6 +655,7 @@ void getTransform(cv::Mat cameraMatrix, cv::Mat distCoeffs, cv::Mat image)
         zeroVectorTransformed = rotationMatrix * translationMatrix;
         std::cout << zeroVectorTransformed << std::endl;
     }
+    cout << "Left process" << endl;
 }
 
 int main(int argc, char *argv[])
@@ -671,9 +676,6 @@ int main(int argc, char *argv[])
         std::cout << dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) << std::endl;
     }
 
-
-    //cfg.enable_stream(RS2_STREAM_COLOR, 960, 540, RS2_FORMAT_RGB8, 30);
-    //cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
 
     cfg.enable_stream(RS2_STREAM_COLOR, 1920, 1080, RS2_FORMAT_RGB8, 30);
     cfg.enable_stream(RS2_STREAM_DEPTH, 1024, 768, RS2_FORMAT_Z16, 30);
@@ -788,8 +790,8 @@ int main(int argc, char *argv[])
             {
                 getTransform(camMatrix, distortionMatrix, cv::Mat(colorHeight, colorWidth, CV_8UC3, colorArr));
                 pipe.stop();
-                cfg.enable_stream(RS2_STREAM_COLOR, 960, 540, RS2_FORMAT_RGB8, 30);
-                cfg.enable_stream(RS2_STREAM_DEPTH, 1024, 768, RS2_FORMAT_Z16, 30);
+                cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_RGB8, 30);
+                cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
                 pipe.start(cfg);
                 continue;
             }
@@ -806,6 +808,7 @@ int main(int argc, char *argv[])
         {
             //13 ms
             processStart = ros::Time::now().toSec();
+            mtx.lock();
             std::thread processCloud(process, pcl_points, pcl_pointsDown, frameNum);
             processCloud.detach();
         }
