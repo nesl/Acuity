@@ -1,0 +1,8 @@
+prefix=/home/nesl/Desktop/Acuity/install
+
+Name: cam_launch
+Description: Description of cam_launch
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

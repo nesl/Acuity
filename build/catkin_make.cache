@@ -1,0 +1,2 @@
+HelloWorld:NESLMessages:cam_launch:combine_cloud:lidar_streamer
+-DCATKIN_DEVEL_PREFIX=/home/nesl/Desktop/Acuity/devel -DCMAKE_INSTALL_PREFIX=/home/nesl/Desktop/Acuity/install -G Unix Makefiles

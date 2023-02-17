@@ -1,0 +1,8 @@
+prefix=/home/nesl/Desktop/Acuity/install
+
+Name: HelloWorld
+Description: Description of HelloWorld
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
