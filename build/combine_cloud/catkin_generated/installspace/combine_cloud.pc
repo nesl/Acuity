@@ -1,0 +1,8 @@
+prefix=/home/nesl/Desktop/Acuity/install
+
+Name: combine_cloud
+Description: Description of combine_cloud
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

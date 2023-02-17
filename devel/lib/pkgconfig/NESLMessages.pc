@@ -1,0 +1,8 @@
+prefix=/home/nesl/Desktop/Acuity/devel
+
+Name: NESLMessages
+Description: Description of NESLMessages
+Version: 0.0.0
+Cflags: -I/home/nesl/Desktop/Acuity/devel/include
+Libs: -L${prefix}/lib 
+Requires: message_runtime

@@ -1,0 +1,8 @@
+prefix=/home/nesl/Desktop/Acuity/install
+
+Name: lidar_streamer
+Description: Description of lidar_streamer
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
