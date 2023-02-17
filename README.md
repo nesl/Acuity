@@ -41,7 +41,7 @@ Change buffer time to 30000 in line 138:
 unsigned buffer_time = 500000 //Change this to 30000 to enable real-time processing
 ```
 
-## LiDAR Code
+## LiDAR Pipeline
 
 ## File Structure
 The src folder is divided into two folders, **cam_launch**, and also **combine_cloud**. **cam_launch** handles the bulk of the LiDAR point cloud generation and processing, outputting the aggregated separated point clouds. There are two cpp files in **cam_launch/src**, **launcher1.cpp** and **launcher2.cpp** which are meant to interface with two separate LiDAR cameras. They both will stream the information to the combine_cloud node. 
@@ -82,8 +82,14 @@ on any terminal, making sure to source the devel/setup.bash directory if it is n
 
 The separated point cloud should now be shown on RVIZ
 
+## Audio Pipline
+
 ## Verifying HARK ROS Installation
 
 While the cam_launch1 program is running, open up a separte terminal and run `rostopic list`. You should see a list of all the published topics, one of which is `camera1/sources`
 
-To view all the sources in the scene
+This topic has messages of the form "HarkSource", which is included in the HARK-ROS package. To view these messages, we must source the environment by running `source {HARK DOWNLOAD DIRECTORY}/hark-ros-msgs-{VERSION}/devel/setup.bash`. Running `rostopic echo camera1/sources` will show the source information. Note that if there is only one source in the scene, there will be a dummy source of ID 100 spawned 180 degrees away from the subject. 
+
+## Verifying HARK Installation
+
+In a terminal, run `hark_designer`. This will open up a Firefox or Chrome page that loads the HARK Designer. Under *File*, browse to the *HARK_Files* directory in the github and load all the .n network files. Open up *AudioProcess.n* and verify that the system is loaded. Also, under the *GHDSS* node, ensure that the A_MATRIX points to the downloaded A_MATRIX.zip files in the repository. Note that this matrix is simply for testing purposes, and you must create your own A_MATRIX for a given room configuration. More information can be found when searching about HARK TF File Generation using TSP. Click through all the nodes and modify any file paths. 
