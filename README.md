@@ -21,6 +21,12 @@ Install the Eigen library by following the instruction in this link: [Eigen Inst
 ### Install Hark: 
 To install the HARK Audio Library, visit the following link: [HARK Installation](https://hark.jp/install/linux/). Install from source to be able to edit the source code (we will change some sampling rate parameters later). Make sure to install all the listed libraries!
 
+Install hark_designer and harktool5_gui using prebuilt packages:
+```
+sudo apt install hark-designer
+sudo apt install harktool5 harktool5-gui
+```
+
 ### Install ROS for HARK:
 To install the HARK ROS Bridge: [HARK ROS](https://hark.jp/hark-ros-msgs-installation-instructions/).
 **Make sure to install from source**
