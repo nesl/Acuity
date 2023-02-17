@@ -81,3 +81,9 @@ rosrun tf static_transform_publisher 0 0 0 0 0 0 map backgone1 30
 on any terminal, making sure to source the devel/setup.bash directory if it is not found.
 
 The separated point cloud should now be shown on RVIZ
+
+## Verifying HARK ROS Installation
+
+While the cam_launch1 program is running, open up a separte terminal and run `rostopic list`. You should see a list of all the published topics, one of which is `camera1/sources`
+
+To view all the sources in the scene
