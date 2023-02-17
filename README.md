@@ -93,3 +93,5 @@ This topic has messages of the form "HarkSource", which is included in the HARK-
 ## Verifying HARK Installation
 
 In a terminal, run `hark_designer`. This will open up a Firefox or Chrome page that loads the HARK Designer. Under *File*, browse to the *HARK_Files* directory in the github and load all the .n network files. Open up *AudioProcess.n* and verify that the system is loaded. Also, under the *GHDSS* node, ensure that the A_MATRIX points to the downloaded A_MATRIX.zip files in the repository. Note that this matrix is simply for testing purposes, and you must create your own A_MATRIX for a given room configuration. More information can be found when searching about HARK TF File Generation using TSP. Click through all the nodes and modify any file paths. 
+
+When running the AudioProcess process along with the LiDAR pipeline, we will be able to extract directional audio in real time with localization information provided by the LiDAR subtraction pipeline. 
